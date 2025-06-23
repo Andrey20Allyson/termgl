@@ -92,70 +92,6 @@ function drawpixel(x, y, color) {
 }
 
 function drawline(x1, y1, x2, y2) {
-  const m_new = 2 * (y2 - y1);
-  let slope_error_new = m_new - (x2 - x1);
-
-  let y = y1;
-  for (let x = x1; x <= x2; x++) {
-    drawpixel(x, y, 0x0077ff00);
-
-    slope_error_new = slope_error_new + m_new;
-
-    if (slope_error_new >= 0) {
-      y = y + 1;
-      slope_error_new = slope_error_new - 2 * (x2 - x1);
-    }
-  }
-}
-
-function drawline2(x1, y1, x2, y2) {
-  const dx = Math.abs(x1 - x2) + 1;
-  const dy = Math.abs(y1 - y2) + 1;
-
-  const ysig = y1 > y2 ? -1 : 1;
-  const xsig = x1 > x2 ? -1 : 1;
-
-  if (dx > dy) {
-    const err_s = Math.abs(Math.ceil(dx / dy));
-    let err = err_s;
-    let x = x1;
-    let y = y1;
-
-    while (xsig === 1 ? x <= x2 : x >= x2) {
-      drawpixel(x, y, 0xffffffff);
-
-      err--;
-      x += xsig;
-
-      if (err <= 0) {
-        err = err_s;
-        y += ysig;
-      }
-    }
-
-    return;
-  }
-
-  const err_s = Math.abs(Math.ceil(dy / dx));
-  let err = err_s;
-  let x = x1;
-  let y = y1;
-  const yf = y + dy;
-
-  while (ysig === 1 ? y <= y2 : y >= y2) {
-    drawpixel(x, y, 0xffffffff);
-
-    err--;
-    y += ysig;
-
-    if (err <= 0) {
-      err = err_s;
-      x += xsig;
-    }
-  }
-}
-
-function drawline3(x1, y1, x2, y2) {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
 
@@ -212,12 +148,6 @@ function project(vec3) {
 
   return [Math.round(vec3[0] * scale) + smw, Math.round(vec3[1] * scale) + smh];
 }
-
-// drawline2(20, 20, 10, 10);
-// drawline2(20, 20, 20, 5);
-// drawline2(20, 20, 30, 10);
-// drawline2(20, 20, 35, 20);
-// drawline2(20, 20, 30, 30);
 
 // drawpoint(20, 20, 0xff00ff00);
 
@@ -570,7 +500,7 @@ class Mesh {
 //     const y = left[i].y;
 //     const xL = left[i].x;
 //     const xR = right[i].x;
-//     // drawline3(xL, y, xR, y);
+//     // drawline(xL, y, xR, y);
 //   }
 // }
 
@@ -606,7 +536,7 @@ function fillFlatBottomTriangle(p0, p1, p2) {
   let curx2 = p0.x;
 
   for (let y = Math.ceil(p0.y); y <= Math.floor(p1.y); y++) {
-    drawline3(curx1, y, curx2, y);
+    drawline(curx1, y, curx2, y);
     curx1 += invslope1;
     curx2 += invslope2;
   }
@@ -620,7 +550,7 @@ function fillFlatTopTriangle(p0, p1, p2) {
   let curx2 = p2.x;
 
   for (let y = Math.floor(p2.y); y >= Math.ceil(p0.y); y--) {
-    drawline3(curx1, y, curx2, y);
+    drawline(curx1, y, curx2, y);
     curx1 -= invslope1;
     curx2 -= invslope2;
   }
@@ -650,9 +580,9 @@ function render_mesh(mesh) {
     const [xb, yb] = project(verticies[ib]);
     const [xc, yc] = project(verticies[ic]);
 
-    drawline3(xa, ya, xb, yb);
-    drawline3(xb, yb, xc, yc);
-    drawline3(xc, yc, xa, ya);
+    drawline(xa, ya, xb, yb);
+    drawline(xb, yb, xc, yc);
+    drawline(xc, yc, xa, ya);
   }
 
   for (const vertex of verticies) {
