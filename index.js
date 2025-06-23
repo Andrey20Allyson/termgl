@@ -464,46 +464,6 @@ class Mesh {
   }
 }
 
-// function fill_triangle(p0, p1, p2) {
-//   [p0, p1, p2] = [p0, p1, p2]
-//     .sort((a, b) => a[1] - b[1])
-//     .map((p) => ({ x: p[0], y: p[1] }));
-
-//   function edgeInterp(y0, y1, x0, x1) {
-//     let res = [];
-//     let dy = y1 - y0;
-//     if (dy === 0) return res;
-//     let dx = (x1 - x0) / dy;
-//     let x = x0;
-//     for (let y = Math.ceil(y0); y <= Math.floor(y1); y++) {
-//       res.push({ x, y });
-//       x += dx;
-//     }
-//     return res;
-//   }
-
-//   // Long edge from top to bottom
-//   let left = edgeInterp(p0.y, p2.y, p0.x, p2.x);
-//   let right = [
-//     ...edgeInterp(p0.y, p1.y, p0.x, p1.x),
-//     ...edgeInterp(p1.y, p2.y, p1.x, p2.x),
-//   ];
-
-//   // Make sure left and right have same y-values
-//   if (left.length !== right.length) {
-//     const temp = left;
-//     left = right;
-//     right = temp;
-//   }
-
-//   for (let i = 0; i < left.length; i++) {
-//     const y = left[i].y;
-//     const xL = left[i].x;
-//     const xR = right[i].x;
-//     // drawline(xL, y, xR, y);
-//   }
-// }
-
 function fill_triangle(p0, p1, p2) {
   // Sort by Y
   [p0, p1, p2] = [p0, p1, p2]
