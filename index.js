@@ -1,7 +1,11 @@
 const { stdout } = require("node:process");
 
-stdout.cursorTo(0, 0);
-stdout.clearScreenDown();
+function clearScreen() {
+  stdout.cursorTo(0, 0);
+  stdout.clearScreenDown();
+}
+
+clearScreen();
 
 const [w, h] = stdout.getWindowSize();
 const screen = {
@@ -84,6 +88,7 @@ function swapbuffers() {
 function clearbuffer(color) {
   for (let i = 0; i < renderbuffers.backbuffer.length; i++) {
     renderbuffers.backbuffer[i] = color;
+    z_buffer.fill(z_buffer_start);
   }
 }
 
@@ -91,16 +96,20 @@ function drawpixel(x, y, color) {
   renderbuffers.backbuffer[x + y * screen.width] = color;
 }
 
-function projectVec(pos) {}
+// function projectVec(pos) {}
 
-const z_buffer = new Float32Array(screen.width * screen.height);
+const z_buffer_start = Infinity;
+const z_buffer = new Float32Array(screen.width * screen.height).fill(
+  z_buffer_start
+);
 
 function draw_pixel_with_z_buffer(pos, color) {
   const index = pos.x + pos.y * screen.width;
-  if (z_buffer[index] > pos.z) {
+  if (z_buffer[index] < pos.z) {
     return;
   }
 
+  z_buffer[index] = pos.z;
   renderbuffers.backbuffer[index] = color;
 }
 
@@ -171,7 +180,7 @@ function drawline3d(v1, v2) {
     let zchange = dz / dx;
 
     while (x !== x2) {
-      drawpixel(x, y, linecolor);
+      draw_pixel_with_z_buffer(new Vec3(x, y, z), linecolor);
       x += xsig;
       z += zchange;
       err -= dy;
@@ -185,7 +194,7 @@ function drawline3d(v1, v2) {
     let zchange = dz / dy;
 
     while (y !== y2) {
-      drawpixel(x, y, linecolor);
+      draw_pixel_with_z_buffer(new Vec3(x, y, z), linecolor);
       y += ysig;
       z += zchange;
       err -= dx;
@@ -197,7 +206,7 @@ function drawline3d(v1, v2) {
   }
 
   // Draw the final point
-  drawpixel(x2, y2, linecolor);
+  draw_pixel_with_z_buffer(v2, linecolor);
 }
 
 function drawpoint(x, y, color) {
@@ -208,9 +217,9 @@ function drawpoint(x, y, color) {
   drawpixel(x, y + 1, color);
 }
 
-function project(vec3) {
-  const fov = 180;
+let fov = 180;
 
+function project(vec3) {
   const scale = fov / (fov + vec3[2]);
   const smw = Math.round(screen.width / 2);
   const smh = Math.round(screen.height / 2);
@@ -219,8 +228,6 @@ function project(vec3) {
 }
 
 function projectVec(vec) {
-  const fov = 180;
-
   const scale = fov / (fov + vec.z);
   const smw = Math.round(screen.width / 2);
   const smh = Math.round(screen.height / 2);
@@ -533,6 +540,8 @@ class Mesh {
   /**@type {[number, number, number][]} */
   indexes = [];
   cframe = new CFrame();
+  /**@type {number[]} */
+  face_colors = [];
 
   constructor() {
     this.cframe = CFrame.fromRotationY(0);
@@ -554,18 +563,56 @@ class BlockMesh extends Mesh {
     const halfSize = size / 2;
 
     this.vertices = [
-      new Vec3(-halfSize, -halfSize, halfSize),
-      new Vec3(halfSize, -halfSize, halfSize),
-      new Vec3(halfSize, halfSize, halfSize),
-      new Vec3(-halfSize, halfSize, halfSize),
+      new Vec3(-halfSize, -halfSize, halfSize), //  #0 back  top    left
+      new Vec3(halfSize, -halfSize, halfSize), //   #1 back  top    right
+      new Vec3(halfSize, halfSize, halfSize), //    #2 back  bottom right
+      new Vec3(-halfSize, halfSize, halfSize), //   #3 back  bottom left
 
-      new Vec3(-halfSize, -halfSize, -halfSize),
-      new Vec3(halfSize, -halfSize, -halfSize),
-      new Vec3(halfSize, halfSize, -halfSize),
-      new Vec3(-halfSize, halfSize, -halfSize),
+      new Vec3(-halfSize, -halfSize, -halfSize), // #4 front top    left
+      new Vec3(halfSize, -halfSize, -halfSize), //  #5 front top    right
+      new Vec3(halfSize, halfSize, -halfSize), //   #6 front bottom right
+      new Vec3(-halfSize, halfSize, -halfSize), //  #7 front bottom left
     ];
 
-    this.indexes = [[0, 1, 2]];
+    this.indexes = [
+      // back face
+      [0, 2, 1],
+      [0, 2, 3],
+
+      // front face
+      [5, 7, 4],
+      [5, 7, 6],
+
+      // top face
+      [0, 5, 1],
+      [0, 5, 4],
+
+      // bottom face
+      [2, 7, 3],
+      [2, 7, 6],
+
+      // left face
+      [0, 7, 3],
+      [0, 7, 4],
+
+      // right face
+      [2, 5, 1],
+      [2, 5, 6],
+    ];
+
+    this.face_colors = [
+      0xff0000ff, 0xff0000ff,
+
+      0xffff00ff, 0xffff00ff,
+
+      0xff00ffff, 0xff00ffff,
+
+      0x0000ffff, 0x0000ffff,
+
+      0x00ff00ff, 0x00ff00ff,
+
+      0x00ffffff, 0x00ffffff,
+    ];
   }
 }
 
@@ -574,58 +621,69 @@ function fill_triangle(p0, p1, p2) {
   [p0, p1, p2] = [p0, p1, p2].sort((a, b) => a.y - b.y);
 
   if (p1.y === p2.y) {
-    // Flat-bottom triangle
     fillFlatBottomTriangle(p0, p1, p2);
   } else if (p0.y === p1.y) {
-    // Flat-top triangle
-    fillFlatTopTriangle(p0, p1, p2);
+    fillFlatTopTriangle(p2, p1, p0);
   } else {
     // General triangle — split
     const alpha = (p1.y - p0.y) / (p2.y - p0.y);
     const vi = {
       x: p0.x + (p2.x - p0.x) * alpha,
       y: p1.y,
+      z: p0.z + (p2.z - p0.z) * alpha,
     };
     fillFlatBottomTriangle(p0, p1, vi);
-    fillFlatTopTriangle(p1, vi, p2);
+    fillFlatTopTriangle(p2, p1, vi);
   }
 }
 
 function fillFlatBottomTriangle(p0, p1, p2) {
-  const invslope1 = (p1.x - p0.x) / (p1.y - p0.y);
-  const invslope2 = (p2.x - p0.x) / (p2.y - p0.y);
+  let dy = Math.abs(p1.y - p0.y);
 
-  let curx1 = p0.x;
-  let curx2 = p0.x;
+  let xr = p1.x;
+  let zr = p1.z;
+  let xrc = (p0.x - p1.x) / dy;
+  let zrc = (p0.z - p1.z) / dy;
 
-  for (let y = Math.ceil(p0.y); y <= Math.floor(p1.y); y++) {
-    drawline(
-      Math.round(curx1),
-      Math.round(y),
-      Math.round(curx2),
-      Math.round(y)
+  let xl = p2.x;
+  let zl = p2.z;
+  let xlc = (p0.x - p2.x) / dy;
+  let zlc = (p0.z - p2.z) / dy;
+
+  for (
+    let y = p1.y;
+    y >= p0.y;
+    y--, xr += xrc, zr += zrc, xl += xlc, zl += zlc
+  ) {
+    drawline3d(
+      new Vec3(Math.round(xr), y, Math.round(zr)),
+      new Vec3(Math.round(xl), y, Math.round(zl))
     );
-    curx1 += invslope1;
-    curx2 += invslope2;
   }
 }
 
 function fillFlatTopTriangle(p0, p1, p2) {
-  const invslope1 = (p2.x - p0.x) / (p2.y - p0.y);
-  const invslope2 = (p2.x - p1.x) / (p2.y - p1.y);
+  let dy = Math.abs(p1.y - p0.y);
 
-  let curx1 = p2.x;
-  let curx2 = p2.x;
+  let xr = p1.x;
+  let zr = p1.z;
+  let xrc = (p0.x - p1.x) / dy;
+  let zrc = (p0.z - p1.z) / dy;
 
-  for (let y = Math.floor(p2.y); y >= Math.ceil(p0.y); y--) {
-    drawline(
-      Math.round(curx1),
-      Math.round(y),
-      Math.round(curx2),
-      Math.round(y)
+  let xl = p2.x;
+  let zl = p2.z;
+  let xlc = (p0.x - p2.x) / dy;
+  let zlc = (p0.z - p2.z) / dy;
+
+  for (
+    let y = p1.y;
+    y <= p0.y;
+    y++, xr += xrc, zr += zrc, xl += xlc, zl += zlc
+  ) {
+    drawline3d(
+      new Vec3(Math.round(xr), y, Math.round(zr)),
+      new Vec3(Math.round(xl), y, Math.round(zl))
     );
-    curx1 -= invslope1;
-    curx2 -= invslope2;
   }
 }
 
@@ -646,26 +704,37 @@ function render_mesh(mesh) {
     const pa = projectVec(verticies[ia]);
     const pb = projectVec(verticies[ib]);
     const pc = projectVec(verticies[ic]);
-
-    fill_triangle(pa, pb, pc);
   }
 
   linecolor = 0xffffffff;
 
-  for (const [ia, ib, ic] of mesh.indexes) {
-    const [xa, ya] = project(verticies[ia]);
-    const [xb, yb] = project(verticies[ib]);
-    const [xc, yc] = project(verticies[ic]);
+  for (let face_index = 0; face_index < mesh.indexes.length; face_index++) {
+    const [ia, ib, ic] = mesh.indexes[face_index];
+    const face_color = mesh.face_colors[face_index];
+    const p0 = projectVec(verticies[ia]);
+    const p1 = projectVec(verticies[ib]);
+    const p2 = projectVec(verticies[ic]);
 
-    drawline(xa, ya, xb, yb);
-    drawline(xb, yb, xc, yc);
-    drawline(xc, yc, xa, ya);
+    linecolor = face_color;
+
+    fill_triangle(p0, p1, p2);
+
+    p0[2] -= 2;
+    p1[2] -= 2;
+    p2[2] -= 2;
+
+    linecolor = 0xffffffff;
+
+    drawline3d(p0, p1);
+    drawline3d(p1, p2);
+    drawline3d(p2, p0);
   }
 
   for (const vertex of verticies) {
-    const [x, y] = project(vertex);
+    const point = projectVec(vertex);
+    point[2] -= 4;
 
-    drawpixel(x, y, 0xff00ff00);
+    draw_pixel_with_z_buffer(point, 0xff00ff00);
   }
 }
 
@@ -688,10 +757,9 @@ function render() {
 
   const b2y = Math.sin(d / 10) * 10;
   b2.position = new Vec3(0, b2y, 0);
-  b2.cframe = CFrame.fromPosition(b2.position).mult(
-    CFrame.fromRotationY(d / 50)
-  );
-  // .mult(CFrame.fromRotationX(d / 50));
+  b2.cframe = CFrame.fromPosition(b2.position).mult(b2.cframe.rotation);
+  // b2.cframe = b2.cframe.mult(CFrame.fromRotationX(d / 250));
+  // b2.cframe = b2.cframe.mult(CFrame.fromRotationY(d / 50));
 
   meshes.forEach(render_mesh);
 
@@ -704,10 +772,20 @@ function render() {
   }, 1_000 / fps);
 }
 
+process.on("SIGINT", function (signal) {
+  clearScreen();
+  console.log("> simulation ended");
+  process.exit(0);
+});
+
 // const b1 = new BlockMesh(20, 20, 20);
 // b1.position = new Vec3(30, 0, 0);
 
-const b2 = new BlockMesh(40, 40, 40);
+fov = 100;
+
+const b2 = new BlockMesh(40);
+b2.cframe = b2.cframe.mult(CFrame.fromRotationY(0.7));
+b2.cframe = b2.cframe.mult(CFrame.fromRotationX(0.7));
 
 // const b2 = new Mesh();
 // b2.vertices = [new Vec3(-10, -10, 0), new Vec3(10, -10, 0), new Vec3(0, 10, 0)];
