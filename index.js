@@ -91,6 +91,21 @@ function drawpixel(x, y, color) {
   renderbuffers.backbuffer[x + y * screen.width] = color;
 }
 
+function projectVec(pos) {}
+
+const z_buffer = new Float32Array(screen.width * screen.height);
+
+function draw_pixel_with_z_buffer(pos, color) {
+  const index = pos.x + pos.y * screen.width;
+  if (z_buffer[index] > pos.z) {
+    return;
+  }
+
+  renderbuffers.backbuffer[index] = color;
+}
+
+let linecolor = 0xffffffff;
+
 function drawline(x1, y1, x2, y2) {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
@@ -105,7 +120,7 @@ function drawline(x1, y1, x2, y2) {
     let err = dx / 2;
 
     while (x !== x2) {
-      drawpixel(x, y, 0xffffffff);
+      drawpixel(x, y, linecolor);
       x += xsig;
       err -= dy;
       if (err < 0) {
@@ -117,7 +132,7 @@ function drawline(x1, y1, x2, y2) {
     let err = dy / 2;
 
     while (y !== y2) {
-      drawpixel(x, y, 0xffffffff);
+      drawpixel(x, y, linecolor);
       y += ysig;
       err -= dx;
       if (err < 0) {
@@ -128,7 +143,61 @@ function drawline(x1, y1, x2, y2) {
   }
 
   // Draw the final point
-  drawpixel(x2, y2, 0xffffffff);
+  drawpixel(x2, y2, linecolor);
+}
+
+function drawline3d(v1, v2) {
+  const x1 = v1.x;
+  const y1 = v1.y;
+  const z1 = v1.z;
+
+  const x2 = v2.x;
+  const y2 = v2.y;
+  const z2 = v2.z;
+
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  const dz = z2 - z1;
+
+  const xsig = x1 < x2 ? 1 : -1;
+  const ysig = y1 < y2 ? 1 : -1;
+
+  let x = x1;
+  let y = y1;
+  let z = z1;
+
+  if (dx > dy) {
+    let err = dx / 2;
+    let zchange = dz / dx;
+
+    while (x !== x2) {
+      drawpixel(x, y, linecolor);
+      x += xsig;
+      z += zchange;
+      err -= dy;
+      if (err < 0) {
+        y += ysig;
+        err += dx;
+      }
+    }
+  } else {
+    let err = dy / 2;
+    let zchange = dz / dy;
+
+    while (y !== y2) {
+      drawpixel(x, y, linecolor);
+      y += ysig;
+      z += zchange;
+      err -= dx;
+      if (err < 0) {
+        x += xsig;
+        err += dy;
+      }
+    }
+  }
+
+  // Draw the final point
+  drawpixel(x2, y2, linecolor);
 }
 
 function drawpoint(x, y, color) {
@@ -147,6 +216,20 @@ function project(vec3) {
   const smh = Math.round(screen.height / 2);
 
   return [Math.round(vec3[0] * scale) + smw, Math.round(vec3[1] * scale) + smh];
+}
+
+function projectVec(vec) {
+  const fov = 180;
+
+  const scale = fov / (fov + vec.z);
+  const smw = Math.round(screen.width / 2);
+  const smh = Math.round(screen.height / 2);
+
+  return new Vec3(
+    Math.round(vec.x * scale) + smw,
+    Math.round(vec.y * scale) + smh,
+    vec.z
+  );
 }
 
 // drawpoint(20, 20, 0xff00ff00);
@@ -464,11 +547,31 @@ class Mesh {
   }
 }
 
+class BlockMesh extends Mesh {
+  constructor(size) {
+    super();
+
+    const halfSize = size / 2;
+
+    this.vertices = [
+      new Vec3(-halfSize, -halfSize, halfSize),
+      new Vec3(halfSize, -halfSize, halfSize),
+      new Vec3(halfSize, halfSize, halfSize),
+      new Vec3(-halfSize, halfSize, halfSize),
+
+      new Vec3(-halfSize, -halfSize, -halfSize),
+      new Vec3(halfSize, -halfSize, -halfSize),
+      new Vec3(halfSize, halfSize, -halfSize),
+      new Vec3(-halfSize, halfSize, -halfSize),
+    ];
+
+    this.indexes = [[0, 1, 2]];
+  }
+}
+
 function fill_triangle(p0, p1, p2) {
   // Sort by Y
-  [p0, p1, p2] = [p0, p1, p2]
-    .map((p) => ({ x: p[0], y: p[1] }))
-    .sort((a, b) => a.y - b.y);
+  [p0, p1, p2] = [p0, p1, p2].sort((a, b) => a.y - b.y);
 
   if (p1.y === p2.y) {
     // Flat-bottom triangle
@@ -496,7 +599,12 @@ function fillFlatBottomTriangle(p0, p1, p2) {
   let curx2 = p0.x;
 
   for (let y = Math.ceil(p0.y); y <= Math.floor(p1.y); y++) {
-    drawline(curx1, y, curx2, y);
+    drawline(
+      Math.round(curx1),
+      Math.round(y),
+      Math.round(curx2),
+      Math.round(y)
+    );
     curx1 += invslope1;
     curx2 += invslope2;
   }
@@ -510,7 +618,12 @@ function fillFlatTopTriangle(p0, p1, p2) {
   let curx2 = p2.x;
 
   for (let y = Math.floor(p2.y); y >= Math.ceil(p0.y); y--) {
-    drawline(curx1, y, curx2, y);
+    drawline(
+      Math.round(curx1),
+      Math.round(y),
+      Math.round(curx2),
+      Math.round(y)
+    );
     curx1 -= invslope1;
     curx2 -= invslope2;
   }
@@ -527,13 +640,17 @@ function render_mesh(mesh) {
 
   verticies = verticies.map((vert) => vert.sum(mesh.cframe.position));
 
+  linecolor = 0x0000ffff;
+
   for (const [ia, ib, ic] of mesh.indexes) {
-    const pa = project(verticies[ia]);
-    const pb = project(verticies[ib]);
-    const pc = project(verticies[ic]);
+    const pa = projectVec(verticies[ia]);
+    const pb = projectVec(verticies[ib]);
+    const pc = projectVec(verticies[ic]);
 
     fill_triangle(pa, pb, pc);
   }
+
+  linecolor = 0xffffffff;
 
   for (const [ia, ib, ic] of mesh.indexes) {
     const [xa, ya] = project(verticies[ia]);
@@ -571,9 +688,10 @@ function render() {
 
   const b2y = Math.sin(d / 10) * 10;
   b2.position = new Vec3(0, b2y, 0);
-  b2.cframe = CFrame.fromPosition(b2.position)
-    .mult(CFrame.fromRotationY(d / 50))
-    .mult(CFrame.fromRotationX(d / 50));
+  b2.cframe = CFrame.fromPosition(b2.position).mult(
+    CFrame.fromRotationY(d / 50)
+  );
+  // .mult(CFrame.fromRotationX(d / 50));
 
   meshes.forEach(render_mesh);
 
@@ -589,11 +707,11 @@ function render() {
 // const b1 = new BlockMesh(20, 20, 20);
 // b1.position = new Vec3(30, 0, 0);
 
-// const b2 = new BlockMesh(40, 40, 40);
+const b2 = new BlockMesh(40, 40, 40);
 
-const b2 = new Mesh();
-b2.vertices = [new Vec3(-10, -10, 0), new Vec3(10, -10, 0), new Vec3(0, 10, 0)];
-b2.indexes = [[0, 1, 2]];
+// const b2 = new Mesh();
+// b2.vertices = [new Vec3(-10, -10, 0), new Vec3(10, -10, 0), new Vec3(0, 10, 0)];
+// b2.indexes = [[0, 1, 2]];
 
 // add_mesh(b1);
 add_mesh(b2);
