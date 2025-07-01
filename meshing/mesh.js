@@ -84,4 +84,38 @@ class BlockMesh extends Mesh {
   }
 }
 
-module.exports = { Mesh, BlockMesh };
+// created by AI
+class TorusMesh extends Mesh {
+  /**
+   * @param {number} R - Major radius (torus ring radius)
+   * @param {number} r - Minor radius (tube radius)
+   * @param {number} segments - Number of segments around the ring
+   * @param {number} sides - Number of segments around the tube
+   */
+  constructor(R, r, segments = 24, sides = 12) {
+    super();
+
+    this.vertices = [];
+    this.indexes = [];
+
+    for (let i = 0; i < segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      const cosTheta = Math.cos(theta);
+      const sinTheta = Math.sin(theta);
+
+      for (let j = 0; j < sides; j++) {
+        const phi = (j / sides) * Math.PI * 2;
+        const cosPhi = Math.cos(phi);
+        const sinPhi = Math.sin(phi);
+
+        const x = (R + r * cosPhi) * cosTheta;
+        const y = r * sinPhi;
+        const z = (R + r * cosPhi) * sinTheta;
+
+        this.vertices.push(new Vec3(x, y, z));
+      }
+    }
+  }
+}
+
+module.exports = { Mesh, BlockMesh, TorusMesh };

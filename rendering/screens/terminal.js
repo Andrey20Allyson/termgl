@@ -19,6 +19,11 @@ function u32torgba(u32) {
   ];
 }
 
+function clearScreen() {
+  stdout.cursorTo(0, 0);
+  stdout.clearScreenDown();
+}
+
 class TerminalScreen {
   constructor() {
     const [w, h] = stdout.getWindowSize();
@@ -26,8 +31,21 @@ class TerminalScreen {
     this.width = w;
     this.height = h * 2;
 
+    this.backbuffer = null;
+    this.frontbuffer = null;
+  }
+
+  init() {
     this.backbuffer = new Uint32Array(this.width * this.height);
     this.frontbuffer = new Uint32Array(this.width * this.height);
+
+    process.on("SIGINT", function (signal) {
+      clearScreen();
+      console.log("> simulation ended");
+      process.exit(0);
+    });
+
+    clearScreen();
   }
 
   swapbuffers() {

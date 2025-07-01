@@ -9,7 +9,7 @@ class Draw3d {
     this.camera = this.scene.camera;
 
     this.zbufferStart = Infinity;
-    this.zbuffer = new Float32Array(this.screen.backbuffer.length);
+    this.zbuffer = new Float32Array(this.screen.width * this.screen.height);
   }
 
   projectVec(vec) {

@@ -16,6 +16,8 @@ class Renderer {
   }
 
   start() {
+    this.screen.init();
+
     this.frame();
   }
 
