@@ -3,6 +3,7 @@ const { Draw3d } = require("./draw");
 const { TerminalScreen } = require("./screens/terminal");
 
 class Renderer {
+  onPreFrame = new EventSubject();
   onFrame = new EventSubject();
 
   constructor(scene) {
@@ -12,15 +13,15 @@ class Renderer {
     this.fps = 30;
 
     this.draw = new Draw3d(this.scene, this.screen);
-
-    this.onFrame.sub(this.handleFrame, this);
   }
 
   start() {
-    this.onFrame.emit();
+    this.frame();
   }
 
-  handleFrame() {
+  frame() {
+    this.onPreFrame.emit();
+
     console.time("render");
     this.draw.color = 0x003030ff;
     this.draw.clear();
@@ -32,7 +33,9 @@ class Renderer {
     this.screen.swapbuffers();
     console.timeEnd("render");
 
-    setTimeout(() => this.onFrame.emit(), 1_000 / this.fps);
+    this.onFrame.emit();
+
+    setTimeout(() => this.frame(), 1_000 / this.fps);
   }
 }
 
