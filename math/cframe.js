@@ -1,3 +1,6 @@
+const { Mat4 } = require("./matrix");
+const { Vec3 } = require("./vector");
+
 class CFrame {
   /**@type {Mat4} */
   mat;
@@ -8,14 +11,6 @@ class CFrame {
 
   get position() {
     return new Vec3(this.mat[3], this.mat[7], this.mat[11]);
-  }
-
-  mult(other) {
-    return new CFrame(this.mat.mult(other.mat));
-  }
-
-  sum(other) {
-    return new CFrame(this.mat.sum(other.mat));
   }
 
   get rotation() {
@@ -70,3 +65,5 @@ class CFrame {
     return cf;
   }
 }
+
+module.exports = { CFrame };

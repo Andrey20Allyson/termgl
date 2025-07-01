@@ -1,31 +1,38 @@
 const { EventSubject } = require("../utils/event-subject");
+const { Draw3d } = require("./draw");
 const { TerminalScreen } = require("./screens/terminal");
 
 class Renderer {
   onFrame = new EventSubject();
 
-  constructor(camera) {
-    this.camera = camera;
+  constructor(scene) {
+    this.scene = scene;
+    this.camera = this.scene.camera;
     this.screen = new TerminalScreen();
     this.fps = 30;
 
-    this.onFrame.sub(this.onFrame, this);
+    this.draw = new Draw3d(this.screen);
+
+    this.onFrame.sub(this.handleFrame, this);
   }
 
   start() {
-    this.onFrame();
+    this.onFrame.emit();
   }
 
-  onFrame() {
+  handleFrame() {
     console.time("render");
-    clearbuffer(0x00303000);
+    this.draw.color = 0x003030ff;
+    this.draw.clear();
 
-    meshes.forEach(render_mesh);
+    this.scene.meshes.forEach((mesh) => {
+      this.draw.mesh(mesh);
+    });
 
-    swapbuffers();
+    this.screen.swapbuffers();
     console.timeEnd("render");
 
-    setInterval(() => this.onFrame.emit(), 1_000 / this.fps);
+    setTimeout(() => this.onFrame.emit(), 1_000 / this.fps);
   }
 }
 

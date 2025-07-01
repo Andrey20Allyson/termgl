@@ -5,7 +5,9 @@ class Scene {
   constructor() {
     this.meshes = [];
     this.camera = new Camera();
-    this.renderer = new Renderer(this.camera);
+    this.renderer = new Renderer(this);
+
+    this.onFrame = this.renderer.onFrame;
   }
 
   add(mesh) {

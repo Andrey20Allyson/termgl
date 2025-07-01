@@ -6,7 +6,7 @@ class EventSubject {
 
   sub(listener, thisArg = null) {
     const id = this._idc++;
-    this._listeners = { id, fn: listener, thisArg };
+    this._listeners.push({ id, fn: listener, thisArg });
 
     return () => this.unsub(id);
   }
