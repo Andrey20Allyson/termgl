@@ -1,4 +1,3 @@
-const { CFrame } = require("./cframe");
 const { Mat4 } = require("./matrix");
 const { Vec3 } = require("./vector");
 
@@ -19,7 +18,7 @@ function mult(a, b) {
     return multm4(a, b);
   }
 
-  if (a instanceof CFrame) {
+  if (a.type === "cframe") {
     return multm4(a.mat, b);
   }
 
@@ -39,8 +38,8 @@ function multn(n, b) {
     return multnm4(n, b);
   }
 
-  if (b instanceof CFrame) {
-    return new CFrame(multnm4(n, b.mat));
+  if (b.type === "cframe") {
+    return new b.constructor(multnm4(n, b.mat));
   }
 
   throw new Error("err");
@@ -80,12 +79,12 @@ function multm4(m4, b) {
     );
   }
 
-  if (b instanceof CFrame) {
-    return new CFrame(multm4m4(m4, b.mat));
-  }
-
   if (b instanceof Mat4) {
     return multm4m4(m4, b);
+  }
+
+  if (b.type === "cframe") {
+    return new b.constructor(multm4m4(m4, b.mat));
   }
 
   throw new Error("err");
@@ -129,7 +128,7 @@ function sum(a, b) {
     return summ4(a, b);
   }
 
-  if (a instanceof CFrame) {
+  if (a.type === "cframe") {
     return summ4(a.mat, b);
   }
 
@@ -149,8 +148,8 @@ function summ4(m4, b) {
     return summ4m4(m4, b);
   }
 
-  if (b instanceof CFrame) {
-    return new CFrame(summ4m4(m4, b.mat));
+  if (b.type === "cframe") {
+    return new b.constructor(summ4m4(m4, b.mat));
   }
 
   throw new Error("err");

@@ -34,41 +34,38 @@ class Draw3d {
   mesh(mesh) {
     let verticies = mesh.vertices;
 
-    verticies = verticies.map((vert) => mult(mesh.cframe.rotation, vert));
+    const relativePosition = mult(
+      mult(-1, this.camera.cframe),
+      mesh.cframe.position
+    );
 
-    verticies = verticies.map((vert) => sum(vert, mesh.cframe.position));
+    verticies = verticies.map((vert) =>
+      mult(mult(this.camera.cframe.rotation, mesh.cframe.rotation), vert)
+    );
 
-    // linecolor = 0x0000ffff;
+    verticies = verticies.map((vert) => sum(vert, relativePosition));
 
-    // for (const [ia, ib, ic] of mesh.indexes) {
-    //   const pa = projectVec(verticies[ia]);
-    //   const pb = projectVec(verticies[ib]);
-    //   const pc = projectVec(verticies[ic]);
-    // }
+    for (let face_index = 0; face_index < mesh.indexes.length; face_index++) {
+      const [ia, ib, ic] = mesh.indexes[face_index];
+      const faceColor = mesh.face_colors[face_index];
+      const p0 = this.projectVec(verticies[ia]);
+      const p1 = this.projectVec(verticies[ib]);
+      const p2 = this.projectVec(verticies[ic]);
 
-    // linecolor = 0xffffffff;
+      this.color = faceColor;
 
-    // for (let face_index = 0; face_index < mesh.indexes.length; face_index++) {
-    //   const [ia, ib, ic] = mesh.indexes[face_index];
-    //   const face_color = mesh.face_colors[face_index];
-    //   const p0 = projectVec(verticies[ia]);
-    //   const p1 = projectVec(verticies[ib]);
-    //   const p2 = projectVec(verticies[ic]);
+      this.face(p0, p1, p2);
 
-    //   linecolor = face_color;
+      p0[2] -= 2;
+      p1[2] -= 2;
+      p2[2] -= 2;
 
-    //   fill_triangle(p0, p1, p2);
+      this.color = 0xffffffff;
 
-    //   p0[2] -= 2;
-    //   p1[2] -= 2;
-    //   p2[2] -= 2;
-
-    //   linecolor = 0xffffffff;
-
-    //   drawline3d(p0, p1);
-    //   drawline3d(p1, p2);
-    //   drawline3d(p2, p0);
-    // }
+      this.line(p0, p1);
+      this.line(p1, p2);
+      this.line(p2, p0);
+    }
 
     this.color = 0xff00ff00;
 
@@ -80,9 +77,80 @@ class Draw3d {
     }
   }
 
-  face(p0, p1, p2) {}
+  face(p0, p1, p2) {
+    // Sort by Y
+    [p0, p1, p2] = [p0, p1, p2].sort((a, b) => a.y - b.y);
 
-  line(p0, p1) {}
+    if (p1.y === p2.y) {
+      this._fillFlatBottomTriangle(p0, p1, p2);
+    } else if (p0.y === p1.y) {
+      this._fillFlatTopTriangle(p2, p1, p0);
+    } else {
+      // General triangle — split
+      const alpha = (p1.y - p0.y) / (p2.y - p0.y);
+      const vi = {
+        x: p0.x + (p2.x - p0.x) * alpha,
+        y: p1.y,
+        z: p0.z + (p2.z - p0.z) * alpha,
+      };
+      this._fillFlatBottomTriangle(p0, p1, vi);
+      this._fillFlatTopTriangle(p2, p1, vi);
+    }
+  }
+
+  line(p0, p1) {
+    const x1 = p0.x;
+    const y1 = p0.y;
+    const z1 = p0.z;
+
+    const x2 = p1.x;
+    const y2 = p1.y;
+    const z2 = p1.z;
+
+    const dx = Math.abs(x2 - x1);
+    const dy = Math.abs(y2 - y1);
+    const dz = z2 - z1;
+
+    const xsig = x1 < x2 ? 1 : -1;
+    const ysig = y1 < y2 ? 1 : -1;
+
+    let x = x1;
+    let y = y1;
+    let z = z1;
+
+    if (dx > dy) {
+      let err = dx / 2;
+      let zchange = dz / dx;
+
+      while (x !== x2) {
+        this.pixel(new Vec3(x, y, z));
+        x += xsig;
+        z += zchange;
+        err -= dy;
+        if (err < 0) {
+          y += ysig;
+          err += dx;
+        }
+      }
+    } else {
+      let err = dy / 2;
+      let zchange = dz / dy;
+
+      while (y !== y2) {
+        this.pixel(new Vec3(x, y, z));
+        y += ysig;
+        z += zchange;
+        err -= dx;
+        if (err < 0) {
+          x += xsig;
+          err += dy;
+        }
+      }
+    }
+
+    // Draw the final point
+    this.pixel(p1);
+  }
 
   pixel(pos) {
     const index = pos.x + pos.y * this.screen.width;
@@ -92,6 +160,56 @@ class Draw3d {
 
     this.zbuffer[index] = pos.z;
     this.screen.backbuffer[index] = this.color;
+  }
+
+  _fillFlatBottomTriangle(p0, p1, p2) {
+    let dy = Math.abs(p1.y - p0.y);
+
+    let xr = p1.x;
+    let zr = p1.z;
+    let xrc = (p0.x - p1.x) / dy;
+    let zrc = (p0.z - p1.z) / dy;
+
+    let xl = p2.x;
+    let zl = p2.z;
+    let xlc = (p0.x - p2.x) / dy;
+    let zlc = (p0.z - p2.z) / dy;
+
+    for (
+      let y = p1.y;
+      y >= p0.y;
+      y--, xr += xrc, zr += zrc, xl += xlc, zl += zlc
+    ) {
+      this.line(
+        new Vec3(Math.round(xr), y, Math.round(zr)),
+        new Vec3(Math.round(xl), y, Math.round(zl))
+      );
+    }
+  }
+
+  _fillFlatTopTriangle(p0, p1, p2) {
+    let dy = Math.abs(p1.y - p0.y);
+
+    let xr = p1.x;
+    let zr = p1.z;
+    let xrc = (p0.x - p1.x) / dy;
+    let zrc = (p0.z - p1.z) / dy;
+
+    let xl = p2.x;
+    let zl = p2.z;
+    let xlc = (p0.x - p2.x) / dy;
+    let zlc = (p0.z - p2.z) / dy;
+
+    for (
+      let y = p1.y;
+      y <= p0.y;
+      y++, xr += xrc, zr += zrc, xl += xlc, zl += zlc
+    ) {
+      this.line(
+        new Vec3(Math.round(xr), y, Math.round(zr)),
+        new Vec3(Math.round(xl), y, Math.round(zl))
+      );
+    }
   }
 }
 

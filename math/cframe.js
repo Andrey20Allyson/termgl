@@ -1,8 +1,10 @@
 const { Mat4 } = require("./matrix");
+const { mult } = require("./opr");
 const { Vec3 } = require("./vector");
 
 class CFrame {
   /**@type {Mat4} */
+  type = "cframe";
   mat;
 
   constructor(mat = Mat4.identity()) {
@@ -31,13 +33,26 @@ class CFrame {
     return `CFrame [\n  ${Aa}, ${Ba}, ${Ca}, ${Da}\n  ${Ab}, ${Bb}, ${Cb}, ${Db}\n  ${Ac}, ${Bc}, ${Cc}, ${Dc}\n  ${Ad}, ${Bd}, ${Cd}, ${Dd}\n]`;
   }
 
-  static fromPosition(vec3) {
+  static fromPosition(x, y, z) {
+    if (x instanceof Vec3) {
+      y = x.y;
+      z = x.z;
+      x = x.x;
+    }
+
     const cf = new CFrame();
-    cf.mat[3] = vec3[0];
-    cf.mat[7] = vec3[1];
-    cf.mat[11] = vec3[2];
+    cf.mat[3] = x;
+    cf.mat[7] = y;
+    cf.mat[11] = z;
 
     return cf;
+  }
+
+  static fromRotation(rx, ry, rz) {
+    return mult(
+      mult(CFrame.fromRotationX(rx), CFrame.fromRotationY(ry)),
+      new CFrame()
+    );
   }
 
   static fromRotationY(angle) {
