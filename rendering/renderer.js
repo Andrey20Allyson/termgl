@@ -11,7 +11,7 @@ class Renderer {
     this.screen = new TerminalScreen();
     this.fps = 30;
 
-    this.draw = new Draw3d(this.screen);
+    this.draw = new Draw3d(this.scene, this.screen);
 
     this.onFrame.sub(this.handleFrame, this);
   }
